@@ -2,7 +2,7 @@ import pygame as pg
 import sys
 from pygame.locals import *
 
-# LEFT OFF AT VIDEO 3: 8:20, rending tile map
+# LEFT OFF AT VIDEO 3: 14:58, tile physics/collisions
 
 # The basic window stuff
 pg.init()
@@ -19,6 +19,7 @@ display = pg.Surface((300, 200))
 # Images
 player_image_temp = pg.image.load('player.png').convert_alpha()
 player_image = pg.transform.scale(player_image_temp, (25, 25))
+player_image.set_colorkey((255, 255, 255))
 grass_image =pg.image.load('grass_block.png').convert_alpha()
 dirt_image = pg.image.load('dirt_block.png').convert_alpha()
 
@@ -30,7 +31,7 @@ player_y_momentum = 0
 player_rect = pg.Rect(player_location[0], player_location[1], player_image.get_width(), player_image.get_height())
 
 # World Objects
-
+TILE_SIZE = dirt_image.get_width() # Should be 16
 
 game_map = [['0','0','0','0','0','0','0','0','0','0','0','0','0','0','0','0','0','0','0'],
             ['0','0','0','0','0','0','0','0','0','0','0','0','0','0','0','0','0','0','0'],
@@ -49,8 +50,6 @@ game_map = [['0','0','0','0','0','0','0','0','0','0','0','0','0','0','0','0','0'
 
 # Game loop
 while True:
-
-
     # Event Loop
     for event in pg.event.get():
         if event.type == QUIT:
@@ -88,6 +87,23 @@ while True:
 
     # Drawing
     display.fill((146, 244, 255))
+
+    tile_rects = []
+    y = 0
+    for layer in game_map:
+        x = 0
+        for tile in layer:
+            if tile == '1':
+                display.blit(dirt_image, (x * TILE_SIZE, y * TILE_SIZE))
+            if tile == '2':
+                display.blit(grass_image, (x * TILE_SIZE, y * TILE_SIZE))
+
+            # Any tile that's not air, gets tracked as a rect for collisions
+            if tile != '0':
+                tile_rects.append(pg.Rect(x * TILE_SIZE, y * TILE_SIZE, TILE_SIZE, TILE_SIZE))
+            x += 1
+        y += 1
+
     display.blit(player_image, player_location)  # puts one surface onto another surface
 
 
