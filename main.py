@@ -20,7 +20,7 @@ display = pg.Surface((300, 200))
 player_image_temp = pg.image.load('player.png').convert_alpha()
 player_image = pg.transform.scale(player_image_temp, (25, 25))
 player_image.set_colorkey((255, 255, 255))
-grass_image =pg.image.load('grass_block.png').convert_alpha()
+grass_image = pg.image.load('grass_block.png').convert_alpha()
 dirt_image = pg.image.load('dirt_block.png').convert_alpha()
 
 # Player info
@@ -30,22 +30,22 @@ player_y_momentum = 0
 air_timer = 0
 player_rect = pg.Rect(50, 50, player_image.get_width(), player_image.get_height())
 
-# World Objects
-TILE_SIZE = dirt_image.get_width()  # Should be 16
+# Camera Scroll
+true_scroll = [0, 0]  # The float scroll
+scroll = [0, 0]  # The int scroll, for tile movements, to prevent them from being choppy
 
-game_map = [['0','0','0','0','0','0','0','0','0','0','0','0','0','0','0','0','0','0','0'],
-            ['0','0','0','0','0','0','0','0','0','0','0','0','0','0','0','0','0','0','0'],
-            ['0','0','0','0','0','0','0','0','0','0','0','0','0','0','0','0','0','0','0'],
-            ['0','0','0','0','0','0','0','0','0','0','0','0','0','0','0','0','0','0','0'],
-            ['0','0','0','0','0','0','0','2','2','2','2','2','0','0','0','0','0','0','0'],
-            ['0','0','0','0','0','0','0','0','0','0','0','0','0','0','0','0','0','0','0'],
-            ['2','2','0','0','0','0','0','0','0','0','0','0','0','0','0','0','0','2','2'],
-            ['1','1','2','2','2','2','2','2','2','2','2','2','2','2','2','2','2','1','1'],
-            ['1','1','1','1','1','1','1','1','1','1','1','1','1','1','1','1','1','1','1'],
-            ['1','1','1','1','1','1','1','1','1','1','1','1','1','1','1','1','1','1','1'],
-            ['1','1','1','1','1','1','1','1','1','1','1','1','1','1','1','1','1','1','1'],
-            ['1','1','1','1','1','1','1','1','1','1','1','1','1','1','1','1','1','1','1'],
-            ['1','1','1','1','1','1','1','1','1','1','1','1','1','1','1','1','1','1','1']]
+# World Objects
+background_objects = [[0.25,[120,10,70,400]],[0.25,[280,30,40,400]],[0.5,[30,40,40,400]],[0.5,[130,90,100,400]],[0.5,[300,80,120,400]]]
+TILE_SIZE = dirt_image.get_width()  # Should be 16
+def load_map(path):
+    with open(path + '.txt', 'r') as file:
+        data = file.read()
+        data = data.split('\n')
+        game_map = []
+        for row in data:
+            game_map.append(list(row))
+        return game_map
+game_map = load_map('map')
 
 
 def collision_test(rect: Rect, tiles: list):
@@ -54,6 +54,7 @@ def collision_test(rect: Rect, tiles: list):
         if rect.colliderect(tile):
             hit_list.append(tile)
     return hit_list
+
 
 def move(rect, movement, tiles):
     collision_types = {'top': False, 'bottom': False, 'left': False, 'right': False}
@@ -90,8 +91,19 @@ def move(rect, movement, tiles):
 
     return rect, collision_types
 
+
 # Game loop
 while True:
+    # Sets the "cameras" position. The divisor adds the lagging behind, smoothing effect
+    true_scroll[0] += (player_rect.x - true_scroll[0] - 140)/20
+    true_scroll[1] += (player_rect.y - true_scroll[1] - 80)/20
+    scroll = true_scroll.copy()
+    # Rounds the float to an int for the drawings not to get choppy
+    scroll[0] = int(scroll[0])
+    scroll[1] = int(scroll[1])
+
+
+
     # Event Loop
     for event in pg.event.get():
         if event.type == QUIT:
@@ -119,18 +131,35 @@ while True:
             if event.key == pg.K_LEFT:
                 moving_left = False
 
-    # Draw and generate world tiles
+    # Draw background fill color
     display.fill((146, 244, 255))
+    # Draw background object 1
+    pg.draw.rect(display, (5, 80, 75), pg.Rect(0, 150, 200, 100))
+    # Draw the parallax background objects
+    for background_object in background_objects:
+        obj_rect = pg.Rect(background_object[1][0]-scroll[0]*background_object[0],
+                           background_object[1][1]-scroll[1]*background_object[0],
+                           background_object[1][2], background_object[1][3])
+        if background_object[0] == 0.5:
+            pg.draw.rect(display, (14, 222, 150), obj_rect)
+        else:
+            pg.draw.rect(display, (9, 91, 85), obj_rect)
 
+
+
+
+        # background_objects = [[0.25, [120, 10, 70, 400]], [0.25, [280, 30, 40, 400]], [0.5, [30, 40, 40, 400]],
+        #                       [0.5, [130, 90, 100, 400]], [0.5, [300, 80, 120, 400]]]
+    # Draw tiles from the game map
     tile_rects = []
     y = 0
     for layer in game_map:
         x = 0
         for tile in layer:
             if tile == '1':
-                display.blit(dirt_image, (x * TILE_SIZE, y * TILE_SIZE))
+                display.blit(dirt_image, (x * TILE_SIZE - scroll[0], y * TILE_SIZE - scroll[1]))
             if tile == '2':
-                display.blit(grass_image, (x * TILE_SIZE, y * TILE_SIZE))
+                display.blit(grass_image, (x * TILE_SIZE - scroll[0], y * TILE_SIZE - scroll[1]))
 
             # Any tile that's not air, gets tracked as a rect for collisions
             if tile != '0':
@@ -161,22 +190,23 @@ while True:
     player_rect, collisions = move(player_rect, player_movement, tile_rects)
 
     # Normally, if we set the player's y momentum to 0, then the next update of 0.2 gravity momentum would not
-    # Increase the momentum enough to move the player 1 pixel (you need at least .6 to round up), so we wouldnt be registering collisions until the momentum
+    # Increase the momentum enough to move the player 1 pixel (you need at least .6 to round up), so we wouldn't be registering collisions until the momentum
     # Reached 1, and then reset it. This is why our balls were shaking up and down in the ball game. To fix this make the
-    # y_momentum = 1 if theres a bottom collision. The other way is to use the air timer.
+    # y_momentum = 1 if theres a bottom collision. The air timer lets us fall slightly off ledges and still get a jump in.
     if collisions['bottom']:
-        player_y_momentum = 0
+        # print('bottom')
+        player_y_momentum = 1
         air_timer = 0
     else:
+        # print('NOT')
         air_timer += 1
-
-
     if collisions['top']:
         player_y_momentum = 0
+
     # Draw the player
-    display.blit(player_image, (player_rect.x, player_rect.y))  # puts one surface onto another surface
+    display.blit(player_image, (player_rect.x - scroll[0], player_rect.y - scroll[1]))  # puts one surface onto another surface
 
-
+    # Scale the display up to the screen size, and draw it onto the screen
     screen.blit(pg.transform.scale(display, WINDOW_SIZE), (0, 0))
     pg.display.update()
     clock.tick(60)
