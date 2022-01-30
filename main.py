@@ -2,13 +2,13 @@ import pygame as pg
 import sys
 from pygame.locals import *
 
-# LEFT OFF AT VIDEO 3: 14:58, tile physics/collisions
+# LEFT OFF AT VIDEO 6:
 
 # The basic window stuff
 pg.init()
 clock = pg.time.Clock()
 pg.display.set_caption('Dafluffy Potato Series')
-WINDOW_SIZE = (600, 400)
+WINDOW_SIZE = (1200, 800)
 screen = pg.display.set_mode(WINDOW_SIZE, 0, 32)
 
 # We are drawing things to this display surface (which is an image btw)
@@ -17,18 +17,16 @@ screen = pg.display.set_mode(WINDOW_SIZE, 0, 32)
 display = pg.Surface((300, 200))
 
 # Images
-player_image_temp = pg.image.load('player.png').convert_alpha()
-player_image = pg.transform.scale(player_image_temp, (25, 25))
-player_image.set_colorkey((255, 255, 255))
 grass_image = pg.image.load('grass_block.png').convert_alpha()
 dirt_image = pg.image.load('dirt_block.png').convert_alpha()
+rect_image = pg.image.load('player.png')
 
 # Player info
 moving_right = False
 moving_left = False
 player_y_momentum = 0
 air_timer = 0
-player_rect = pg.Rect(50, 50, player_image.get_width(), player_image.get_height())
+player_rect = pg.Rect(50, 50, rect_image.get_width(), rect_image.get_height())
 
 # Camera Scroll
 true_scroll = [0, 0]  # The float scroll
@@ -47,6 +45,48 @@ def load_map(path):
         return game_map
 game_map = load_map('map')
 
+global animation_frames
+# Stores all the animation images with their respective names
+animation_frames = {}
+
+def load_animation(path, frame_durations): # [7, 7] ?
+    # frame_durations is a list which contains a value for each img in the animation, the value is how many
+    # frames that image will show for
+    global animation_frames
+    # C:\Users\effa1_000\PycharmProjects\dafluffy_potato_series\animations\idle
+    # split returns a list, the last element is the folder name of the animation images
+    animation_name = path.split('/')[-1]
+    animation_frame_data = []
+    n = 0
+    for frame in frame_durations:
+        # This is how the img is named in the directory. ex. "run_0"
+        animation_frame_id = animation_name + '_' + str(n)
+        # Generates the img exact path. ex. 'C:\Users\....\idle_0.png'
+        img_loc = path +'/' + animation_frame_id + '.png '
+        # Load the image using the path
+        animation_img = pg.image.load(img_loc).convert_alpha()
+        # Stores the animation data
+        animation_frames[animation_frame_id] = animation_img.copy()
+        for i in range(frame):
+            animation_frame_data.append(animation_frame_id)
+        n += 1
+        # [run_0, run_0, run_0, run_0, run_1, run_1, run_1, run_1...]
+    return animation_frame_data
+
+# Need to figure this one out myself
+def change_action(action_var, frame, new_value):
+    if action_var != new_value:
+        action_var = new_value
+        frame = 0
+    return action_var, frame
+
+# Animation stuff
+animation_database = {}
+animation_database['run'] = load_animation('animations/run', [7, 7, 7, 7])
+animation_database['idle'] = load_animation('animations/idle', [30, 7])
+player_action = 'idle'
+player_frame = 0
+player_flip = False
 
 def collision_test(rect: Rect, tiles: list):
     hit_list = []
@@ -203,8 +243,28 @@ while True:
     if collisions['top']:
         player_y_momentum = 0
 
+    # Determine the player action
+    if player_movement[0] > 0:
+        # If you are already on run, it will not change it to run and reset the frame counters
+        player_action, player_frame = change_action(player_action, player_frame, 'run')
+        player_flip = False
+    if player_movement[0] == 0:
+        player_action, player_frame = change_action(player_action, player_frame, 'idle')
+    if player_movement[0] < 0:  # Same thing but running left
+        player_action, player_frame = change_action(player_action, player_frame, 'run')
+        player_flip = True
+
     # Draw the player
-    display.blit(player_image, (player_rect.x - scroll[0], player_rect.y - scroll[1]))  # puts one surface onto another surface
+    player_frame += 1
+    # Loops the animation back to the beginning
+    if player_frame >= len(animation_database[player_action]):
+        player_frame = 0
+    # Gets the name of the image from the players action and frame counter
+    player_image_id = animation_database[player_action][player_frame]
+    # Uses the image name to get the actual image, and set it to be the players image
+    player_image = animation_frames[player_image_id]
+    # Draw the image to the display, flipping the images if we need to using transform
+    display.blit(pg.transform.flip(player_image, player_flip, False), (player_rect.x - scroll[0], player_rect.y - scroll[1]))  # puts one surface onto another surface
 
     # Scale the display up to the screen size, and draw it onto the screen
     screen.blit(pg.transform.scale(display, WINDOW_SIZE), (0, 0))
