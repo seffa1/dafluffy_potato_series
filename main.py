@@ -22,7 +22,12 @@ display = pg.Surface((300, 200))
 # Images
 grass_image = pg.image.load('grass_block.png').convert_alpha()
 dirt_image = pg.image.load('dirt_block.png').convert_alpha()
-rect_image = pg.image.load('player.png')
+rect_image = pg.image.load('player.png').convert_alpha()
+plant_image = pg.image.load('plant.png').convert_alpha()
+
+tile_index = {1:grass_image,
+              2:dirt_image,
+              3:plant_image}
 
 # Sounds
 jump_sound = pg.mixer.Sound('sounds/jump.wav')
@@ -48,15 +53,39 @@ scroll = [0, 0]  # The int scroll, for tile movements, to prevent them from bein
 # World Objects
 background_objects = [[0.25,[120,10,70,400]],[0.25,[280,30,40,400]],[0.5,[30,40,40,400]],[0.5,[130,90,100,400]],[0.5,[300,80,120,400]]]
 TILE_SIZE = dirt_image.get_width()  # Should be 16
-def load_map(path):
-    with open(path + '.txt', 'r') as file:
-        data = file.read()
-        data = data.split('\n')
-        game_map = []
-        for row in data:
-            game_map.append(list(row))
-        return game_map
-game_map = load_map('map')
+game_map = {}
+CHUNK_SIZE = 8
+# New way to generate tiles using chunks
+def generate_chunks(x, y):
+    chunk_data = []
+    # Goes through all the locations in the chunk and generates the appropriate tiles for that location
+    for y_pos in range(CHUNK_SIZE):
+        for x_pos in range(CHUNK_SIZE):
+            target_x = x * CHUNK_SIZE + x_pos
+            target_y = y * CHUNK_SIZE + y_pos
+            tile_type = 0  # Nothing (Air)
+            if target_y > 10:
+                tile_type = 2  # Dirt
+            elif target_y == 10:
+                tile_type = 1  # grass
+            elif target_y == 9:
+                if random.randint(1, 5) == 1:
+                    tile_type = 3  # Plants
+            if tile_type != 0:
+                chunk_data.append([[target_x, target_y], tile_type])
+    return chunk_data
+# {'1:1':chunk_data, '1:2': chunk_data...etc}
+
+# OLD WAY OF BUILDING THE MAP
+# def load_map(path):
+#     with open(path + '.txt', 'r') as file:
+#         data = file.read()
+#         data = data.split('\n')
+#         game_map = []
+#         for row in data:
+#             game_map.append(list(row))
+#         return game_map
+
 
 global animation_frames
 # Stores all the animation images with their respective names
@@ -203,30 +232,47 @@ while True:
         else:
             pg.draw.rect(display, (9, 91, 85), obj_rect)
 
-
-
-
-        # background_objects = [[0.25, [120, 10, 70, 400]], [0.25, [280, 30, 40, 400]], [0.5, [30, 40, 40, 400]],
-        #                       [0.5, [130, 90, 100, 400]], [0.5, [300, 80, 120, 400]]]
     # Draw tiles from the game map
     tile_rects = []
-    y = 0
-    for layer in game_map:
-        x = 0
-        for tile in layer:
-            if tile == '1':
-                display.blit(dirt_image, (x * TILE_SIZE - scroll[0], y * TILE_SIZE - scroll[1]))
-            if tile == '2':
-                display.blit(grass_image, (x * TILE_SIZE - scroll[0], y * TILE_SIZE - scroll[1]))
+    # New way of rendering chunks and tiles
+    # Calculates the chunk ID's for chunks on the screen
+    # screen height = 200 / 128 pixles in a chunk = 1.5 chunks visable on y-axis
+    # Round up to 2 chunks, then add 1 to get to 3. Same for x-axis
+    # The extra 1 is a buffer so you cant see the chunks loading in or out
+    for y in range(3):
+        for x in range(4):
+            target_x = x -1 + int(round(scroll[0] / (CHUNK_SIZE*16)))
+            target_y = y -1 + int(round(scroll[1] / (CHUNK_SIZE*16)))
+            target_chunk = str(target_x) + ';' + str(target_y)
+            # If a chunk location doesnt exist yet, it generates it
+            if target_chunk not in game_map:
+                game_map[target_chunk] = generate_chunks(target_x, target_y)
+            for tile in game_map[target_chunk]:
+                display.blit(tile_index[tile[1]], (tile[0][0]*16-scroll[0], tile[0][1]*16-scroll[1]))
+                # If the tile is dirt or grass, it needs physics
+                if tile[1] in [1, 2]:
+                    tile_rects.append(pg.Rect(tile[0][0]*16, tile[0][1]*16, 16, 16))
 
-            # Any tile that's not air, gets tracked as a rect for collisions
-            if tile != '0':
-                tile_rects.append(pg.Rect(x * TILE_SIZE, y * TILE_SIZE, TILE_SIZE, TILE_SIZE))
-            x += 1
-        y += 1
+    # OLD WAY OF TILE RENDERING
+    # y = 0
+    # for layer in game_map:
+    #     x = 0
+    #     for tile in layer:
+    #         if tile == '1':
+    #             display.blit(dirt_image, (x * TILE_SIZE - scroll[0], y * TILE_SIZE - scroll[1]))
+    #         if tile == '2':
+    #             display.blit(grass_image, (x * TILE_SIZE - scroll[0], y * TILE_SIZE - scroll[1]))
+    #
+    #         # Any tile that's not air, gets tracked as a rect for collisions
+    #         if tile != '0':
+    #             tile_rects.append(pg.Rect(x * TILE_SIZE, y * TILE_SIZE, TILE_SIZE, TILE_SIZE))
+    #         x += 1
+    #     y += 1
+    # New way of tile rendering
+
+
 
     # Updates for the player
-
     # Calc the amount we intend to move the player from user inputs
     # X axis
     player_movement = [0, 0]
