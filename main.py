@@ -1,11 +1,14 @@
 import pygame as pg
-import sys
+import sys, random
 from pygame.locals import *
 
 # LEFT OFF AT VIDEO 6:
 
 # The basic window stuff
+pg.mixer.pre_init(44100, -16, 2, 512)  # I think this is the same as mixer.init()
 pg.init()
+pg.mixer.set_num_channels(64)  # how many sounds can play at once
+
 clock = pg.time.Clock()
 pg.display.set_caption('Dafluffy Potato Series')
 WINDOW_SIZE = (1200, 800)
@@ -20,6 +23,16 @@ display = pg.Surface((300, 200))
 grass_image = pg.image.load('grass_block.png').convert_alpha()
 dirt_image = pg.image.load('dirt_block.png').convert_alpha()
 rect_image = pg.image.load('player.png')
+
+# Sounds
+jump_sound = pg.mixer.Sound('sounds/jump.wav')
+jump_sound.set_volume(0.4)
+grass_sounds = [pg.mixer.Sound('sounds/grass_0.wav'), pg.mixer.Sound('sounds/grass_1.wav')]
+grass_sounds[0].set_volume(0.4)
+grass_sounds[1].set_volume(0.4)
+pg.mixer.music.load('sounds/music.wav')
+pg.mixer.music.play(-1) # -1 to keep the music looping
+grass_sound_timer = 0
 
 # Player info
 moving_right = False
@@ -142,6 +155,8 @@ while True:
     scroll[0] = int(scroll[0])
     scroll[1] = int(scroll[1])
 
+    if grass_sound_timer > 0:
+        grass_sound_timer -= 1
 
 
     # Event Loop
@@ -154,6 +169,8 @@ while True:
             sys.exit()
 
         if event.type == pg.KEYDOWN:
+            if event.key == pg.K_w:
+                pg.mixer.music.fadeout(3000)
             if event.key == pg.K_RIGHT:
                 moving_right = True
             if event.key == pg.K_LEFT:
@@ -163,6 +180,7 @@ while True:
                 # Allows you to jump if you just stepped off a ledge, which is nice
                 # And also prevents you from jumping more tha once at a time
                 if air_timer < 6:
+                    jump_sound.play()
                     player_y_momentum = - 5
 
         if event.type == pg.KEYUP:
@@ -237,6 +255,11 @@ while True:
         # print('bottom')
         player_y_momentum = 1
         air_timer = 0
+        if player_movement[0] != 0:
+            if grass_sound_timer == 0:
+                grass_sound_timer = 30
+                random.choice(grass_sounds).play()
+
     else:
         # print('NOT')
         air_timer += 1
